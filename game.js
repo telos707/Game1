@@ -1,12 +1,41 @@
-const availableUnits = [
-    { cls: "Knight", hp: 50, atk: 15, def: 10 },
-    { cls: "Archer", hp: 35, atk: 12, def: 5 },
-    { cls: "Mage", hp: 30, atk: 18, def: 3 },
-    null // Represents empty space
-  ];
-  
- let playerFormation = Array(9).fill(null); // 9 empty slots
+const availableUnits = Object.values(unitPool).concat(null); // `null` = empty slot
+ 
+const unitPool = {
+  Knight: { cls: "Knight", hp: 50, atk: 15, def: 10, cost: 3 },
+  Archer: { cls: "Archer", hp: 35, atk: 12, def: 5, cost: 2 },
+  Mage:   { cls: "Mage",   hp: 30, atk: 18, def: 3, cost: 4 },
+  Healer: { cls: "Healer", hp: 28, atk: 6,  def: 4, cost: 3 }
+};
+ 
+const UNIT_BUDGET = 9; // total unit value allowed per team
 
+let playerFormation = Array(9).fill(null); // 9 empty slots
+
+function createEnemyTeam() {
+    enemyTeam = [];
+    let budget = UNIT_BUDGET;
+  
+    const positions = [0, 1, 2, 3, 4, 5, 6, 7, 8].sort(() => Math.random() - 0.5);
+  
+    while (budget > 0 && enemyTeam.length < 9) {
+      const unitDefs = Object.values(unitPool).filter(u => u.cost <= budget);
+      if (unitDefs.length === 0) break;
+  
+      const unitDef = unitDefs[Math.floor(Math.random() * unitDefs.length)];
+      const pos = positions.pop();
+  
+      enemyTeam.push(new Unit(
+        unitDef.cls,
+        unitDef.cls,
+        unitDef.hp,
+        unitDef.atk,
+        unitDef.def,
+        pos
+      ));
+  
+      budget -= unitDef.cost;
+    }
+  }  
 
 // Emoji by class
 const emojiMap = {
@@ -40,19 +69,6 @@ const emojiMap = {
   // [0][1][2]
   // [3][4][5]
   // [6][7][8]
-  
-  function createTeams() {
-    playerTeam = [
-      new Unit("Alice", "Knight", 50, 15, 10, 6), // front row
-      new Unit("Bob", "Archer", 35, 12, 5, 4),   // middle
-      new Unit("Celine", "Mage", 30, 18, 3, 1)   // back row
-    ];
-    enemyTeam = [
-      new Unit("GoblinA", "Goblin", 40, 10, 4, 0),
-      new Unit("GoblinB", "Goblin", 40, 10, 4, 3),
-      new Unit("Ogre", "Ogre", 60, 20, 8, 8)
-    ];
-  }  
   
   function renderGrid(team, containerId, isPlayer = false) {
     const container = document.getElementById(containerId);
@@ -151,27 +167,20 @@ const emojiMap = {
     }
   
     playerTeam = team;
-    createEnemyTeam();
+    createEnemyTeam(); // now this happens at page load instead
     const result = simulateBattle(playerTeam, enemyTeam);
     renderGrid(playerTeam, "player-grid");
     renderGrid(enemyTeam, "enemy-grid");
     document.getElementById("result-text").textContent = result;
   }
- 
-  function createEnemyTeam() {
-    enemyTeam = [
-      new Unit("GoblinA", "Goblin", 40, 10, 4, 0),
-      new Unit("GoblinB", "Goblin", 40, 10, 4, 3),
-      new Unit("Ogre", "Ogre", 60, 20, 8, 8)
-    ];
-  }
-  
-  
+    
   // Event listener is below this line
   document.addEventListener("DOMContentLoaded", () => {
+    createEnemyTeam(); // 👈 create enemies right away
+    renderGrid([], "player-grid", true); // interactive
+    renderGrid(enemyTeam, "enemy-grid"); // render enemies
     document.getElementById("start-btn").addEventListener("click", startBattle);
-    renderGrid([], "enemy-grid");
-    renderGrid([], "player-grid", true); // Interactive player grid
   });
+  
   
   
