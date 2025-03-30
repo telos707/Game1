@@ -1,25 +1,43 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tactical RPG Battle</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body data-game-state="setup">
   <h1>⚔️ Tactical RPG Battle</h1>
-
-  <div>
-    <button id="start-btn">Start Battle</button>
+  
+  <!-- Message Display -->
+  <div id="message"></div>
+  
+  <!-- Setup Phase Controls -->
+  <div id="unit-pool-container">
+    <h2>🧑‍🤝‍🧑 Available Units</h2>
+    <p>Drag and drop units into your zone (green area)</p>
+    <div id="unit-pool" class="pool"></div>
+    
+    <h3>💰 Team Budget: <span id="budget-count">0 / 9</span></h3>
+    <button id="battle-btn">Start Battle</button>
   </div>
-
-  <h2>👥 Player Team</h2>
-  <div id="player-grid" class="grid"></div>
-
-  <h2>👹 Enemy Team</h2>
-  <div id="enemy-grid" class="grid"></div>
-
-  <h2 id="result-text"></h2>
-
-  <!-- ✅ Make sure this is the last thing in <body> -->
+  
+  <!-- Battle Controls -->
+  <div id="battle-controls" class="hidden">
+    <div id="result-text"></div>
+    <button id="reset-btn" class="hidden">Reset Game</button>
+  </div>
+  
+  <!-- Battlefield -->
+  <h2>Battlefield</h2>
+  <div id="battle-grid" class="grid-wide"></div>
+  
+  <!-- Battle Log -->
+  <div id="battle-log-container" class="hidden">
+    <h2>📝 Battle Log</h2>
+    <div id="battle-log"></div>
+  </div>
+  
   <script src="game.js"></script>
 </body>
 </html>
