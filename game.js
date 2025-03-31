@@ -29,15 +29,18 @@ const GameState = {
     document.body.dataset.gameState = state;
     
     // Hide/show elements based on state
-    if (state === this.BATTLE) {
-      document.getElementById("unit-pool-container").classList.add("hidden");
-      document.getElementById("battle-controls").classList.remove("hidden");
-      document.getElementById("battle-log-container").classList.remove("hidden");
-    } else if (state === this.SETUP) {
-      document.getElementById("unit-pool-container").classList.remove("hidden");
-      document.getElementById("battle-controls").classList.add("hidden");
-      document.getElementById("battle-log-container").classList.add("hidden");
-    }
+  if (state === this.BATTLE) {
+    document.getElementById("unit-pool-container").classList.add("hidden");
+    document.getElementById("battle-controls").classList.remove("hidden");
+    document.getElementById("battle-log-container").classList.remove("hidden");
+  } else if (state === this.SETUP) {
+    document.getElementById("unit-pool-container").classList.remove("hidden");
+    document.getElementById("battle-controls").classList.add("hidden");
+    document.getElementById("battle-log-container").classList.add("hidden");
+
+    // Clear any selections when returning to setup
+    clearSelections();
+  }
   }
 };
 
@@ -55,6 +58,9 @@ let playerTeam = [];
 let enemyTeam = [];
 let turnQueue = [];
 let battleInProgress = false;
+// Unit selection tracking (for repositioning)
+let currentSelection = null;
+let selectedUnitType = null;
 
 // =============================
 // 2. Emoji Map & Unit Definitions
@@ -244,11 +250,17 @@ function initializeGrid() {
       div.innerHTML = "—";
       div.classList.add("empty");
 
-      // Setup drag & drop for player zone cells during setup phase
-      if (PLAYER_ZONE.includes(col) && GameState.current === GameState.SETUP) {
-        div.dataset.index = index;
+      // Add data-index for all cells to support repositioning
+      div.dataset.index = index;
+      
+      // Setup event handlers based on zone and game state
+      if (PLAYER_ZONE.includes(col)) {
+        // Desktop: Drag & drop
         div.addEventListener("dragover", e => e.preventDefault());
         div.addEventListener("drop", handleDrop);
+        
+        // Add click handling for repositioning
+        div.addEventListener("click", handleCellClick);
       }
 
       container.appendChild(div);
@@ -263,6 +275,9 @@ function initializeGrid() {
  * then living units on top to ensure proper visual layering.
  */
 function updateGrid(playerFormation, enemyFormation) {
+  // Check if we're on a mobile device
+  const isMobile = window.isTouchDevice;
+  
   // Clear all cells first
   for (let index = 0; index < GRID_WIDTH * GRID_HEIGHT; index++) {
     const cell = document.getElementById(`grid-cell-${index}`);
@@ -271,10 +286,12 @@ function updateGrid(playerFormation, enemyFormation) {
     cell.innerHTML = "—";
     cell.classList.add("empty");
     cell.classList.remove("dead");
+    cell.classList.remove("selected");
     cell.title = "";
   }
   
-  // First render dead units so they appear "behind" living units
+  // TWO-PASS RENDERING:
+  // First pass: render all dead units
   for (let index = 0; index < GRID_WIDTH * GRID_HEIGHT; index++) {
     const unit = playerFormation[index] || enemyFormation[index];
     if (!unit || unit.alive) continue;
@@ -284,15 +301,15 @@ function updateGrid(playerFormation, enemyFormation) {
     
     cell.innerHTML = `
       <div class="unit-icon">${unit.getEmoji()}</div>
-      <div class="unit-name">${unit.name}</div>
-      <div class="unit-hp">HP: 0/${unit.maxHp}</div>
+      ${!isMobile ? `<div class="unit-name">${unit.name}</div>
+      <div class="unit-hp">HP: 0/${unit.maxHp}</div>` : ''}
     `;
     cell.classList.remove("empty");
     cell.classList.add("dead");
     cell.title = `${unit.cls} - ${unit.trait}: ${unit.traitDesc} (defeated)`;
   }
   
-  // Then render living units on top
+  // Second pass: render all living units ON TOP
   for (let index = 0; index < GRID_WIDTH * GRID_HEIGHT; index++) {
     const unit = playerFormation[index] || enemyFormation[index];
     if (!unit || !unit.alive) continue;
@@ -304,15 +321,33 @@ function updateGrid(playerFormation, enemyFormation) {
     const barColor = healthPct > 60 ? "green" : healthPct > 30 ? "yellow" : "red";
     const healthBar = `<div class="health-bar"><div class="health-fill ${barColor}" style="width:${healthPct}%"></div></div>`;
     
+    // Conditionally render content based on device type
     cell.innerHTML = `
       <div class="unit-icon">${unit.getEmoji()}</div>
-      <div class="unit-name">${unit.name}</div>
+      ${!isMobile ? `<div class="unit-name">${unit.name}</div>` : ''}
       ${healthBar}
-      <div class="unit-hp">HP: ${Math.max(0, unit.hp)}/${unit.maxHp}</div>
+      ${!isMobile ? `<div class="unit-hp">HP: ${Math.max(0, unit.hp)}/${unit.maxHp}</div>` : ''}
     `;
     cell.classList.remove("empty");
     cell.classList.remove("dead");
     cell.title = `${unit.cls} - ${unit.trait}: ${unit.traitDesc}`;
+    
+    // Add selected class if this is the currently selected unit
+    if (currentSelection === index) {
+      cell.classList.add("selected");
+    }
+    
+    // Add remove button for player units during setup
+    if (GameState.current === GameState.SETUP && playerFormation.includes(unit)) {
+      const removeBtn = document.createElement("div");
+      removeBtn.className = "remove-unit-btn";
+      removeBtn.textContent = "✕";
+      removeBtn.addEventListener("click", (e) => {
+        e.stopPropagation(); // Prevent triggering cell click
+        removeUnit(index);
+      });
+      cell.appendChild(removeBtn);
+    }
   }
 }
 
@@ -345,26 +380,47 @@ function renderUnitPool() {
   const container = document.getElementById("unit-pool");
   container.innerHTML = "";
   
-  // Create draggable unit cards for each player unit type
+  // Detect if we're on a touch device
+  const isTouchDevice = window.isTouchDevice;
+  
   Object.entries(unitPool)
-    .filter(([key]) => !["Goblin", "Ogre"].includes(key)) // Only player units
+    .filter(([key]) => !["Goblin", "Ogre"].includes(key))
     .forEach(([key, def]) => {
       const div = document.createElement("div");
-      div.className = "unit draggable";
-      div.draggable = true;
-      div.innerHTML = `
-        <div class="unit-icon">${emojiMap[def.cls]}</div>
-        <div class="unit-name">${def.cls}</div>
-        <div class="unit-trait">${def.trait}</div>
-        <div class="unit-cost">💰 ${def.cost}</div>
-        <div class="unit-stats">
-          HP: ${def.hp} | ATK: ${def.atk} | DEF: ${def.def}
-          <br>RNG: ${def.rng} | SPD: ${def.spd}
-        </div>
-      `;
-      div.title = def.traitDesc;
+      div.className = "unit";
+      
+      // Different handling based on device type
+      if (isTouchDevice) {
+        div.classList.add("tap-selectable");
+        div.addEventListener("click", () => handleUnitSelect(def.cls));
+        
+        // Simplified mobile display
+        div.innerHTML = `
+          <div class="unit-icon">${emojiMap[def.cls]}</div>
+          <div class="unit-name">${def.cls}</div>
+          <div class="unit-trait">${def.trait}</div>
+          <div class="unit-cost">💰 ${def.cost}</div>
+        `;
+      } else {
+        // Full desktop display
+        div.classList.add("draggable");
+        div.draggable = true;
+        div.addEventListener("dragstart", e => e.dataTransfer.setData("unitType", def.cls));
+        
+        div.innerHTML = `
+          <div class="unit-icon">${emojiMap[def.cls]}</div>
+          <div class="unit-name">${def.cls}</div>
+          <div class="unit-trait">${def.trait}</div>
+          <div class="unit-cost">💰 ${def.cost}</div>
+          <div class="unit-stats">
+            HP: ${def.hp} | ATK: ${def.atk} | DEF: ${def.def}
+            <br>RNG: ${def.rng} | SPD: ${def.spd}
+          </div>
+        `;
+      }
+      
+      div.title = `${def.cls} - ${def.trait}: ${def.traitDesc}\nHP: ${def.hp} | ATK: ${def.atk} | DEF: ${def.def} | RNG: ${def.rng} | SPD: ${def.spd}`;
       div.dataset.unitType = def.cls;
-      div.addEventListener("dragstart", e => e.dataTransfer.setData("unitType", def.cls));
       container.appendChild(div);
     });
 }
@@ -377,34 +433,248 @@ function handleDrop(e) {
   e.preventDefault();
   const index = parseInt(e.currentTarget.dataset.index);
   const unitType = e.dataTransfer.getData("unitType");
+  
+  if (unitType) {
+    placeUnit(unitType, index); // New unit from pool
+  } else if (currentSelection !== null) {
+    repositionUnit(currentSelection, index); // Reposition existing unit
+  }
+}
+
+function initMobileControls() {
+  const cancelBtn = document.getElementById("cancel-selection-btn");
+  const removeBtn = document.getElementById("remove-unit-btn");
+  
+  // Show mobile controls only on touch devices
+  if (window.isTouchDevice) {
+    document.getElementById("mobile-controls").classList.remove("hidden");
+    
+    // Add event listeners
+    cancelBtn.addEventListener("click", clearSelections);
+    removeBtn.addEventListener("click", () => {
+      if (currentSelection !== null) {
+        removeUnit(currentSelection);
+      }
+    });
+  }
+
+  
+  // Update the instructions text for mobile users
+  if (window.isTouchDevice) {
+    const instructions = document.querySelector("p");
+    instructions.textContent = "Tap a unit to select, then tap a green zone to place it";
+  }
+}
+
+// Call this function in your DOMContentLoaded event handler
+
+/**
+ * Handles mobile/touch tap-based unit placement and repositioning
+ */
+function handleCellClick(e) {
+  // Only handle clicks during setup phase
+  if (GameState.current !== GameState.SETUP) return;
+  
+  const index = parseInt(e.currentTarget.dataset.index);
+  
+  // If we have a unit type selected from the pool, place it
+  if (selectedUnitType) {
+    placeUnit(selectedUnitType, index);
+    selectedUnitType = null;
+    return;
+  }
+  
+  // If a unit is already selected, reposition it
+  if (currentSelection !== null) {
+    // If clicking the same cell, deselect it
+    if (currentSelection === index) {
+      clearSelections();
+    } else {
+      // Otherwise, reposition the unit
+      repositionUnit(currentSelection, index);
+    }
+    return;
+  }
+  
+  // If clicking on a cell with a unit, select it
+  if (playerFormation[index]) {
+    setCurrentSelection(index);
+  }
+}
+
+/**
+ * Handles unit selection from the pool (for mobile)
+ */
+function handleUnitSelect(unitType) {
+  // Clear any existing selections
+  clearSelections();
+  
+  // Set the selected unit type
+  selectedUnitType = unitType;
+  
+  // Update UI to show selection
+  document.querySelectorAll(".unit.tap-selectable").forEach(el => {
+    if (el.dataset.unitType === unitType) {
+      el.classList.add("selected");
+    }
+  });
+  
+  // Update mobile controls
+  updateMobileControls();
+  
+  // Show message to guide user
+  showMessage(`Tap a green zone to place ${unitType}`);
+}
+
+/**
+ * Places a unit on the grid (new unit from pool)
+ */
+function placeUnit(unitType, index) {
+  // Validate index is in player zone
+  if (!PLAYER_ZONE.includes(index % GRID_WIDTH)) {
+    showMessage("⚠️ Units can only be placed in your zone (green area)");
+    return;
+  }
+  
   const def = unitPool[unitType];
   if (!def) return;
 
+  // Check if placement would exceed budget
+  const testFormation = [...playerFormation];
+  
   // Remove unit if already exists at this position
-  if (playerFormation[index]) {
-    playerFormation[index] = null;
+  if (testFormation[index]) {
+    testFormation[index] = null;
   }
-
+  
   // Create new unit
   const name = `${unitType}_${index}`;
   const newUnit = new Unit(name, unitType, def.hp, def.atk, def.def, def.rng, def.spd, index);
-  
-  // Check if placement would exceed budget
-  const testFormation = [...playerFormation];
   testFormation[index] = newUnit;
-  const cost = calculateTeamCost(testFormation);
   
+  const cost = calculateTeamCost(testFormation);
   if (cost > UNIT_BUDGET) {
     showMessage("🚫 Over budget!");
     return;
   }
 
   // Apply changes
-  playerFormation[index] = newUnit;
+  playerFormation = testFormation;
   updateGrid(playerFormation, enemyFormation);
   updateBudgetUI();
+  
+  // Clear selections
+  clearSelections();
 }
 
+/**
+ * Repositions an existing unit on the grid
+ */
+function repositionUnit(fromIndex, toIndex) {
+  // Validate target index is in player zone
+  if (!PLAYER_ZONE.includes(toIndex % GRID_WIDTH)) {
+    showMessage("⚠️ Units can only be placed in your zone (green area)");
+    return;
+  }
+  
+  // Get the unit to move
+  const unit = playerFormation[fromIndex];
+  if (!unit) return;
+  
+  // Make a copy of the formation for testing
+  const testFormation = [...playerFormation];
+  
+  // Swap units if there's a unit at the destination
+  const targetUnit = testFormation[toIndex];
+  
+  // Update unit positions
+  if (targetUnit) {
+    targetUnit.position = fromIndex;
+    testFormation[fromIndex] = targetUnit;
+  } else {
+    testFormation[fromIndex] = null;
+  }
+  
+  unit.position = toIndex;
+  testFormation[toIndex] = unit;
+  
+  // Apply changes
+  playerFormation = testFormation;
+  updateGrid(playerFormation, enemyFormation);
+  
+  // Clear selections
+  clearSelections();
+}
+
+/**
+ * Removes a unit from the grid
+ */
+function removeUnit(index) {
+  if (playerFormation[index]) {
+    playerFormation[index] = null;
+    updateGrid(playerFormation, enemyFormation);
+    updateBudgetUI();
+    clearSelections();
+  }
+}
+
+/**
+ * Sets the current selection to the given index
+ */
+function setCurrentSelection(index) {
+  // Clear previous selection
+  clearSelections();
+  
+  // Set new selection
+  currentSelection = index;
+  
+  // Update UI
+  const cell = document.getElementById(`grid-cell-${index}`);
+  if (cell) {
+    cell.classList.add("selected");
+  }
+}
+
+/**
+ * Clears all selections
+ */
+function clearSelections() {
+  // Clear selected unit type
+  selectedUnitType = null;
+  
+  // Clear current selection
+  currentSelection = null;
+  
+  // Remove selected class from all cells
+  document.querySelectorAll(".selected").forEach(el => {
+    el.classList.remove("selected");
+  });
+}
+// Update mobile controls
+updateMobileControls();
+
+/**
+ * Updates mobile control buttons based on current state
+ */
+function updateMobileControls() {
+  if (!window.isTouchDevice) return;
+  
+  const cancelBtn = document.getElementById("cancel-selection-btn");
+  const removeBtn = document.getElementById("remove-unit-btn");
+  
+  // Show/hide controls based on current selection
+  if (selectedUnitType || currentSelection !== null) {
+    cancelBtn.classList.remove("hidden");
+  } else {
+    cancelBtn.classList.add("hidden");
+  }
+  
+  if (currentSelection !== null) {
+    removeBtn.classList.remove("hidden");
+  } else {
+    removeBtn.classList.add("hidden");
+  }
+}
 // =============================
 // 8. Budget Tracking
 // =============================
@@ -1078,6 +1348,12 @@ window.addEventListener("DOMContentLoaded", () => {
   initializeGrid();
   renderUnitPool();
   updateBudgetUI();
+  
+  // Check if the device is touch-enabled
+  window.isTouchDevice = 'ontouchstart' in window || navigator.msMaxTouchPoints;
+  
+  // Initialize mobile controls
+  initMobileControls();
   
   // Event listeners
   document.getElementById("battle-btn").addEventListener("click", simulateBattle);

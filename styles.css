@@ -44,6 +44,13 @@ button:disabled {
   display: none !important;
 }
 
+/* Budget display styling */
+.budget-display {
+  margin: 10px auto;
+  font-weight: bold;
+  color: #444;
+}
+
 /* Grid Layout */
 .grid-wide {
   display: grid;
@@ -123,15 +130,21 @@ button:disabled {
   text-decoration: line-through;
 }
 
+.unit:not(.dead) {
+  z-index: 2; /* Higher z-index for living units */
+}
+
+.unit.dead {
+  z-index: 1; /* Lower z-index for dead units */
+}
+
+/* Empty cells */
 .empty {
   background-color: #f0f0f0;
   color: #ccc;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.empty {
   animation: fade-out 0.4s;
 }
 
@@ -196,6 +209,18 @@ button:disabled {
   border-radius: 10px;
   padding: 2px 5px;
   font-size: 12px;
+}
+
+/* Selected unit styling */
+.unit.selected {
+  outline: 3px solid #3498db;
+  box-shadow: 0 0 10px rgba(52, 152, 219, 0.5);
+}
+
+/* Unit Repositioning */
+.selected {
+  outline: 3px dashed #3498db;
+  z-index: 5;
 }
 
 /* Battle Effects */
@@ -276,4 +301,309 @@ button:disabled {
   font-weight: bold;
   margin: 20px 0;
   height: 40px;
+}
+
+/* Remove button for selected units */
+.remove-unit-btn {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background-color: #e74c3c;
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  z-index: 20;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.unit:hover .remove-unit-btn {
+  opacity: 1;
+}
+
+/* Mobile-friendly buttons */
+.mobile-action-btn {
+  padding: 10px;
+  margin: 5px;
+  width: 100%;
+  max-width: 200px;
+}
+
+#mobile-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 10px 0;
+}
+
+/* Add styles for mobile touch interactions */
+.tap-selectable {
+  cursor: pointer;
+}
+
+/* Status indicator for better unit state visualization */
+.unit-status {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  font-size: 16px;
+}
+
+.status-indicator.defeated {
+  color: #e74c3c;
+}
+
+.status-indicator.critical {
+  color: #f39c12;
+}
+
+/* ===================================
+   MOBILE OPTIMIZATIONS (TABLET)
+   =================================== */
+@media (max-width: 768px) {
+  /* Header sizing for tablets */
+  h1 {
+    font-size: 24px;
+    padding-bottom: 8px;
+    margin-top: 10px;
+  }
+  
+  h2 {
+    font-size: 20px;
+    margin-top: 15px;
+    margin-bottom: 8px;
+  }
+  
+  h3 {
+    font-size: 16px;
+    margin-top: 10px;
+  }
+  
+  /* Reduce body padding */
+  body {
+    padding: 15px 10px;
+  }
+  
+  /* Smaller grid for mobile */
+  .grid-wide {
+    grid-template-columns: repeat(8, minmax(30px, 1fr));
+    grid-template-rows: repeat(3, minmax(60px, auto));
+    gap: 2px;
+    width: 100%;
+    margin: 10px auto;
+  }
+  
+  /* Make unit pool wrap better */
+  .pool {
+    gap: 5px;
+  }
+  
+  /* Instructions display */
+  .drag-instructions {
+    display: none;
+  }
+  
+  .tap-instructions {
+    display: block;
+  }
+  
+  /* Mobile controls */
+  #mobile-controls {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 10px 0;
+  }
+  
+  /* Grid units styling */
+  #battle-grid .unit {
+    width: 30px;
+    height: 30px;
+    font-size: 0.7rem;
+    padding: 2px;
+    min-height: unset;
+  }
+  
+  /* Hide name and HP counter on placed units for mobile */
+  body[data-device-type="touch"] #battle-grid .unit:not(.empty) .unit-name,
+  body[data-device-type="touch"] #battle-grid .unit:not(.empty) .unit-hp {
+    display: none;
+  }
+  
+  /* Make emoji bigger to ensure visibility */
+  body[data-device-type="touch"] #battle-grid .unit-icon {
+    font-size: 1.2rem;
+    margin-bottom: 0;
+  }
+  
+  /* Adjust health bar for mobile */
+  body[data-device-type="touch"] #battle-grid .health-bar {
+    width: 90%;
+    height: 4px;
+    margin: 2px 0;
+  }
+  
+  /* Adjust the grid layout for better spacing */
+  #battle-grid {
+    gap: 2px;
+    padding: 5px;
+  }
+  
+  /* Ensure dead units are properly styled */
+  body[data-device-type="touch"] #battle-grid .dead .unit-icon {
+    opacity: 0.4;
+  }
+  
+  /* Improve the unit selection pool layout on mobile */
+  .unit.tap-selectable {
+    width: 75px;
+    height: 85px;
+    padding: 4px;
+    font-size: 11px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  
+  /* Adjust icon size */
+  .unit.tap-selectable .unit-icon {
+    font-size: 20px;
+    margin-bottom: 2px;
+  }
+  
+  /* Make unit name more compact */
+  .unit.tap-selectable .unit-name {
+    font-size: 12px;
+    margin: 0;
+  }
+  
+  /* Hide stats on mobile to save space */
+  .unit.tap-selectable .unit-stats {
+    display: none;
+  }
+  
+  /* Make trait text smaller */
+  .unit.tap-selectable .unit-trait {
+    font-size: 10px;
+    margin: 0;
+  }
+  
+  /* Make cost badge more compact */
+  .unit.tap-selectable .unit-cost {
+    font-size: 10px;
+    padding: 1px 4px;
+    top: 2px;
+    right: 2px;
+  }
+  
+  /* Reposition selected cells to be more visible */
+  #battle-grid .selected {
+    box-shadow: 0 0 0 3px #3498db;
+    outline: none;
+  }
+}
+
+/* ===================================
+   MOBILE OPTIMIZATIONS (PHONE)
+   =================================== */
+@media (max-width: 480px) {
+  /* Header sizing for phones */
+  h1 {
+    font-size: 20px;
+    padding-bottom: 6px;
+    margin-top: 5px;
+  }
+  
+  h2 {
+    font-size: 16px;
+    margin-top: 10px;
+    margin-bottom: 5px;
+  }
+  
+  h3 {
+    font-size: 14px;
+    margin-top: 5px;
+  }
+  
+  /* Reduce body padding further */
+  body {
+    padding: 10px 5px;
+  }
+  
+  /* Make sure the message doesn't cover too much of the screen */
+  #message {
+    max-width: 80%;
+    font-size: 14px;
+    padding: 8px 12px;
+  }
+  
+  /* Reduce spacing between elements */
+  p {
+    margin: 5px 0;
+    font-size: 13px;
+  }
+  
+  /* Smaller result text */
+  #result-text {
+    font-size: 18px;
+    margin: 10px 0;
+    height: 30px;
+  }
+
+  /* Smaller grid for very small screens */
+  .grid-wide {
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(3, 50px);
+  }
+  
+  /* Make battle grid cells slightly larger for better touch targets */
+  #battle-grid .unit {
+    width: 35px;
+    height: 35px;
+  }
+  
+  /* Display only the most essential information */
+  .unit-trait {
+    display: none;
+  }
+  
+  /* Make the battle log smaller */
+  #battle-log {
+    height: 120px;
+    font-size: 11px;
+  }
+  
+  /* Touch-friendly buttons */
+  button {
+    padding: 10px;
+    width: 100%;
+    max-width: 250px;
+    margin: 5px auto;
+    display: block;
+  }
+  
+  /* Mobile action buttons */
+  .mobile-action-btn {
+    margin: 3px;
+    padding: 8px;
+  }
+  
+  /* Make unit selection even more compact */
+  .unit.tap-selectable {
+    width: 65px;
+    height: 70px;
+    padding: 3px;
+  }
+  
+  /* Focus only on the most important info */
+  .pool {
+    gap: 4px;
+    margin: 8px auto;
+  }
 }

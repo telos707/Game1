@@ -15,13 +15,28 @@
   <!-- Setup Phase Controls -->
   <div id="unit-pool-container">
     <h2>🧑‍🤝‍🧑 Available Units</h2>
-    <p>Drag and drop units into your zone (green area)</p>
+    <p class="drag-instructions">Drag and drop units into your zone (green area)</p>
+    <p class="tap-instructions hidden">Tap a unit to select, then tap a green zone to place it</p>
+    
+    <!-- Add this budget display -->
+    <div class="budget-display">
+      <span>Team Budget: </span>
+      <span id="budget-count">0 / 12</span>
+    </div>
+    
     <div id="unit-pool" class="pool"></div>
     
-    <h3>💰 Team Budget: <span id="budget-count">0 / 9</span></h3>
-    <button id="battle-btn">Start Battle</button>
+    <!-- Mobile Controls (only visible on small screens) -->
+    <div id="mobile-controls" class="hidden">
+      <button id="cancel-selection-btn" class="mobile-action-btn hidden">Cancel Selection</button>
+      <button id="remove-unit-btn" class="mobile-action-btn hidden">Remove Selected Unit</button>
+    </div>
   </div>
   
+  <div class="main-controls">
+    <button id="battle-btn">Start Battle</button>
+  </div>
+
   <!-- Battle Controls -->
   <div id="battle-controls" class="hidden">
     <div id="result-text"></div>
@@ -37,6 +52,22 @@
     <h2>📝 Battle Log</h2>
     <div id="battle-log"></div>
   </div>
+  
+  <!-- Device detection script -->
+  <script>
+    // Check if the device is touch-enabled
+    window.isTouchDevice = 'ontouchstart' in window || navigator.msMaxTouchPoints;
+    
+    // Add device type as data attribute to the body
+    document.body.dataset.deviceType = window.isTouchDevice ? 'touch' : 'desktop';
+    
+    // Update UI based on device type
+    if (window.isTouchDevice) {
+      document.querySelector('.drag-instructions').classList.add('hidden');
+      document.querySelector('.tap-instructions').classList.remove('hidden');
+      document.getElementById('mobile-controls').classList.remove('hidden');
+    }
+  </script>
   
   <script src="game.js"></script>
 </body>
